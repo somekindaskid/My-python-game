@@ -3,57 +3,57 @@ import os
 import random
 
 # -----------------------------------------------------------------------------
-# Constants (all speeds in per-second so physics work at any FPS)
+# just some numbers they do shi. speeds are per-second so it vibes at any fps
 # -----------------------------------------------------------------------------
 WINDOW_W = 800
 WINDOW_H = 800
 PIPE_SEGMENT_WIDTH = 80
 GAP_MIN_HEIGHT = 90
 GAP_MAX_HEIGHT = 160
-BASE_SCROLL_SPEED = 600         # pixels per second
-SPEED_INCREASE_PER_POINT = 2.0    # capped by difficulty at score 50
+BASE_SCROLL_SPEED = 600         # px per second or whatever
+SPEED_INCREASE_PER_POINT = 2.0    # stops ramping at 50, we chillin
 MAX_DIFFICULTY_SCORE = 50
 CUBE_SIZE = 44
-CUBE_BORDER_RADIUS = 6          # rounded corners; hitbox matches this shape
-CUBE_SMOOTH_SPEED = 80          # how fast cube follows mouse (per second)
+CUBE_BORDER_RADIUS = 6          # rounded corners n stuff, hitbox goes with it
+CUBE_SMOOTH_SPEED = 80          # cube chases the mouse, take it easy
 GOAL_SCORE = 999
 HUD_HEIGHT = 48
-FPS_TARGET = 165                   # for display only; logic uses delta time
-PIPE_GAP_MIN = 200                # medium default; overridden by difficulty
+FPS_TARGET = 165                   # just for the display, logic does its own thing w delta time
+PIPE_GAP_MIN = 200                # default vibes, difficulty tweaks it later
 PIPE_GAP_MAX = 320
-# Difficulty presets: base_scroll, speed_per_point, gap_min, gap_max, gap_height_min, gap_height_max
+# difficulty stuff: scroll, speed per point, gaps, whatever. we'll get there
 DIFFICULTIES = {
     "easy": {"base_scroll": 380, "speed_per_point": 1.0, "pipe_gap_min": 280, "pipe_gap_max": 400, "gap_h_min": 110, "gap_h_max": 190},
     "medium": {"base_scroll": 460, "speed_per_point": 1.2, "pipe_gap_min": 240, "pipe_gap_max": 360, "gap_h_min": 100, "gap_h_max": 170},
     "hard": {"base_scroll": 540, "speed_per_point": 1.6, "pipe_gap_min": 200, "pipe_gap_max": 290, "gap_h_min": 88, "gap_h_max": 150},
 }
-# Flap mode (Flappy Bird style)
-GRAVITY = 780.0                   # pixels per second^2 downward (higher = fall quicker)
-FLAP_IMPULSE = -320.0             # upward velocity on flap (pixels per second)
-MAX_FALL_SPEED = 580.0            # cap downward speed (higher with gravity for snappier fall)
+# flap mode, flappy bird vibes
+GRAVITY = 780.0                   # pull down, bigger number = fall faster idc
+FLAP_IMPULSE = -320.0             # little boost up when u flap
+MAX_FALL_SPEED = 580.0            # dont fall too fast, we takin our time
 
-# Path to your music file - place your MP3 in the game folder and set this name
+# drop ur mp3 in the folder and put the name here whenever
 MUSIC_FILENAME = "music.mp3"
-# Home screen beat reaction: interval between beats in ms (e.g. 500 = 120 BPM). Tune to match your song.
+# title screen pulse to the beat, 500ms = like 120 bpm or something. match ur song if u feel like it
 HOME_BEAT_INTERVAL_MS = 500
-HOME_BEAT_PULSE_SCALE = 0.14   # how much the title scales on each beat (e.g. 0.14 = 14% bigger at hit)
-HOME_BEAT_DECAY = 5.0          # how fast the pulse falls off (higher = snappier)
+HOME_BEAT_PULSE_SCALE = 0.14   # title gets a little bigger on the beat, no biggie
+HOME_BEAT_DECAY = 5.0          # pulse fades out, higher = quicker fade
 
-# Time attack mode
+# time attack or whatever
 TIME_ATTACK_GOAL = 30
 TIME_ATTACK_SECONDS = 60.0
 
-# Flappy mode: flap control only; gaps stay in a narrow vertical band (less up/down travel)
+# flappy mode: just flap, gaps stay in a narrow band so u dont gotta move as much
 FLAPPY_GAP_CENTER_RANGE = 130
 
-# Slow-down: 5 gaps = full charge (2 segments), hold SPACE to slow (3s total when full); cooldown between uses
+# slow mo: 5 gaps fills it, hold space to slow down. 3 sec when full. cooldown after. no rush
 SLOW_CHARGE_MAX = 2.0
-SLOW_CHARGE_PER_GAP = SLOW_CHARGE_MAX / 5.0  # 5 gaps to fill
+SLOW_CHARGE_PER_GAP = SLOW_CHARGE_MAX / 5.0  # 5 gaps and ur charged
 SLOW_DURATION_SEC = 3.0
 SLOW_TIME_SCALE = 0.35
 SLOW_COOLDOWN_SEC = 2.0
 
-# Visual themes: bg, pipe_fill, pipe_outline, cube_color, cube_outline, hud_line, hud_text
+# colors n stuff for each theme. bg, pipes, cube, hud. whatever
 THEMES = {
     "classic": {"bg": (24, 28, 36), "pipe_fill": (50, 55, 75), "pipe_outline": (70, 78, 100), "cube": (70, 130, 200), "cube_outline": (40, 80, 140), "hud_line": (60, 60, 70), "hud_text": (220, 220, 230)},
     "neon": {"bg": (12, 8, 24), "pipe_fill": (80, 20, 120), "pipe_outline": (200, 80, 255), "cube": (0, 255, 200), "cube_outline": (100, 255, 255), "hud_line": (120, 60, 180), "hud_text": (200, 220, 255)},
@@ -62,12 +62,12 @@ THEMES = {
 
 
 def get_asset_path(filename):
-    """Return path next to the script so it works when run from any cwd."""
+    """path next to the script so it works from wherever u run it. idc"""
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
 
 
 def load_music(volume=0.6):
-    """Load and start background music if the file exists."""
+    """loads n plays the music if the file's there. no rush"""
     path = get_asset_path(MUSIC_FILENAME)
     if os.path.isfile(path):
         try:
@@ -81,7 +81,7 @@ def load_music(volume=0.6):
 
 
 def _circle_rect_overlap(cx, cy, radius, rect):
-    """True if circle (cx, cy, radius) overlaps rect."""
+    """circle touch rect? yeah or nah"""
     closest_x = max(rect.left, min(cx, rect.right))
     closest_y = max(rect.top, min(cy, rect.bottom))
     dx = cx - closest_x
@@ -90,7 +90,7 @@ def _circle_rect_overlap(cx, cy, radius, rect):
 
 
 def rounded_rect_collides_rect(cube_rect, radius, wall_rect):
-    """True if rounded rect (cube_rect with border_radius) overlaps wall_rect."""
+    """rounded cube bump into wall? we'll see"""
     x, y = cube_rect.left, cube_rect.top
     w, h = cube_rect.width, cube_rect.height
     r = radius
@@ -107,7 +107,7 @@ def rounded_rect_collides_rect(cube_rect, radius, wall_rect):
 
 
 class PipeSegment:
-    """One segment of pipe: a vertical strip with a gap at gap_y, gap_height."""
+    """one pipe chunk. vertical strip with a gap in it. vibes"""
 
     __slots__ = ("x", "width", "gap_center_y", "gap_half_height", "scored", "was_in_gap")
 
@@ -129,7 +129,7 @@ class PipeSegment:
         self.x += dx
 
     def collides_with_cube(self, cube_rect, play_top, play_bottom, radius=0):
-        """True if cube (rounded rect with given radius) overlaps this segment's wall."""
+        """cube hit this pipe wall? maybe. we takin our time to check"""
         gap_top = self.gap_top()
         gap_bottom = self.gap_bottom()
         top_wall = pygame.Rect(self.x, play_top, self.width, gap_top - play_top)
@@ -145,7 +145,7 @@ class PipeSegment:
         return False
 
     def is_in_gap(self, cube_rect):
-        """True if cube center is inside the gap when overlapping this segment."""
+        """cube's center in the gap? chill check"""
         seg_left = self.x
         seg_right = self.x + self.width
         if cube_rect.right < seg_left or cube_rect.left > seg_right:
@@ -159,12 +159,12 @@ class PipeSegment:
         return gap_top <= cy <= gap_bottom
 
     def is_passed_cube(self, cube_x):
-        """True if segment has passed the cube (for giving score once)."""
+        """pipe already went past the cube so we only score once. no double dipping"""
         return self.x + self.width < cube_x
 
 
 def spawn_segment(x, play_top, play_bottom, gap_h_min=None, gap_h_max=None, flappy=False):
-    """Create a new pipe segment with a random gap. If flappy=True, gap center stays in a narrow vertical band."""
+    """makes a new pipe with a random gap. flappy mode keeps the gap in a narrow band, whatever"""
     if gap_h_min is None:
         gap_h_min = GAP_MIN_HEIGHT
     if gap_h_max is None:
@@ -184,7 +184,7 @@ def spawn_segment(x, play_top, play_bottom, gap_h_min=None, gap_h_max=None, flap
 
 
 def draw_cube_with_face(surface, rect, theme_dict, ghost_alpha=None):
-    """Draw a rounded cube with eyes and a smile. theme_dict has 'cube' and 'cube_outline'. If ghost_alpha set, draw semi-transparent."""
+    """draws the little cube with a face. theme has the colors. ghost_alpha = kinda see-through if u want"""
     color = theme_dict["cube"]
     outline = theme_dict["cube_outline"]
     if ghost_alpha is not None:
@@ -239,7 +239,7 @@ def run_game():
     cube_velocity_y = 0.0
     cursor_visible = True
     difficulty = "medium"
-    game_mode = "normal"  # "normal", "time_attack", or "flappy"
+    game_mode = "normal"  # normal, time_attack, or flappy. whatever u feel
     time_attack_remaining = TIME_ATTACK_SECONDS
     elapsed_time = 0.0
     theme = "classic"
@@ -386,7 +386,7 @@ def run_game():
         if on_play_screen:
             th = THEMES[theme]
             screen.fill(th["bg"])
-            # Beat reaction: drive pulse from music position (or time if no music)
+            # title pulse from music or just time if no track. chillin
             pos_ms = pygame.mixer.music.get_pos()
             if pos_ms < 0:
                 pos_ms = pygame.time.get_ticks()
@@ -438,7 +438,7 @@ def run_game():
             effective = min(score, MAX_DIFFICULTY_SCORE)
             scroll_speed = diff_params["base_scroll"] + effective * diff_params["speed_per_point"]
 
-            # Slow-down: hold SPACE to slow (drains charge); cooldown after each use
+            # slow mo: hold space, drains the charge. cooldown after. no rush
             slow_cooldown_remaining = max(0.0, slow_cooldown_remaining - dt_sec)
             can_use_slow = slow_cooldown_remaining <= 0
             space_held = pygame.key.get_pressed()[pygame.K_SPACE]
@@ -517,7 +517,7 @@ def run_game():
         hud_text += "  |  TAB = Mod menu"
         text_surf = font_hud.render(hud_text, True, th["hud_text"])
         screen.blit(text_surf, (20, 12))
-        # Slow meter: 2 segments = full, hold SPACE to use; cooldown between uses
+        # slow meter. 2 bars = full. hold space to use. cooldown between. we good
         if not on_play_screen:
             meter_x, meter_y = win_w - 100, 14
             slow_label = font_hud.render("Slow", True, th["hud_text"])
