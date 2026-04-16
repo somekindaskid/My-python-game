@@ -3,7 +3,7 @@ import os
 import random
 
 # -----------------------------------------------------------------------------
-# just some numbers they do shi. speeds are per-second so it vibes at any fps
+# just some numbers, no rush. speeds are per-second so it vibes at any fps
 # -----------------------------------------------------------------------------
 WINDOW_W = 800
 WINDOW_H = 800
@@ -15,10 +15,11 @@ SPEED_INCREASE_PER_POINT = 2.0    # stops ramping at 50, we chillin
 MAX_DIFFICULTY_SCORE = 50
 CUBE_SIZE = 44
 CUBE_BORDER_RADIUS = 6          # rounded corners n stuff, hitbox goes with it
+CUBE_HITBOX_SCALE = 0.50       # 30% smaller than the visual cube
 CUBE_SMOOTH_SPEED = 80          # cube chases the mouse, take it easy
-GOAL_SCORE = 999
+GOAL_SCORE = 30
 HUD_HEIGHT = 48
-FPS_TARGET = 165                   # just for the display, logic does its own thing w delta time
+FPS_TARGET = 100               # just for the display, logic does its own thing w delta time
 PIPE_GAP_MIN = 200                # default vibes, difficulty tweaks it later
 PIPE_GAP_MAX = 320
 # difficulty stuff: scroll, speed per point, gaps, whatever. we'll get there
@@ -52,6 +53,9 @@ SLOW_CHARGE_PER_GAP = SLOW_CHARGE_MAX / 5.0  # 5 gaps and ur charged
 SLOW_DURATION_SEC = 3.0
 SLOW_TIME_SCALE = 0.35
 SLOW_COOLDOWN_SEC = 2.0
+GAME_SPEED_MIN = 0.5
+GAME_SPEED_MAX = 1.5
+GAME_SPEED_STEP = 0.05
 
 # colors n stuff for each theme. bg, pipes, cube, hud. whatever
 THEMES = {
@@ -62,7 +66,7 @@ THEMES = {
 
 
 def get_asset_path(filename):
-    """path next to the script so it works from wherever u run it. idc"""
+    """path next to the script so it works from wherever u run it."""
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
 
 
@@ -77,6 +81,18 @@ def load_music(volume=0.6):
             return True
         except pygame.error:
             pass
+    return False
+
+
+def set_music_playback_rate(rate):
+    """Set music speed/pitch when supported by the pygame build."""
+    setter = getattr(pygame.mixer.music, "set_playback_rate", None)
+    if callable(setter):
+        try:
+            setter(rate)
+            return True
+        except pygame.error:
+            return False
     return False
 
 
@@ -210,6 +226,13 @@ def draw_cube_with_face(surface, rect, theme_dict, ghost_alpha=None):
     pygame.draw.arc(surface, (30, 30, 40), smile_rect, 0, 3.14159, 2)
 
 
+def get_player_hitbox_rect(cube_x, cube_y):
+    """Return a centered collision rect smaller than the drawn cube."""
+    hit_size = max(4, int(CUBE_SIZE * CUBE_HITBOX_SCALE))
+    inset = (CUBE_SIZE - hit_size) // 2
+    return pygame.Rect(int(cube_x) + inset, int(cube_y) + inset, hit_size, hit_size)
+
+
 def run_game():
     pygame.init()
     pygame.mixer.init()
@@ -248,10 +271,13 @@ def run_game():
     ghost_data = []
     current_run_recording = []
     show_ghost = False
+    show_fps = False
+    game_speed_scale = 1.0
     slow_charge = 0.0
     slow_cooldown_remaining = 0.0
     slow_was_active_prev = False
-    load_music(music_volume)
+    music_loaded = load_music(music_volume)
+    audio_rate_supported = music_loaded and set_music_playback_rate(1.0)
 
     running = True
     while running:
@@ -373,6 +399,16 @@ def run_game():
                         sfx_volume = min(1.0, sfx_volume + 0.1)
                     if event.key == pygame.K_x:
                         sfx_volume = max(0.0, sfx_volume - 0.1)
+                    if event.key == pygame.K_p:
+                        show_fps = not show_fps
+                    if event.key == pygame.K_LEFT:
+                        game_speed_scale = max(GAME_SPEED_MIN, game_speed_scale - GAME_SPEED_STEP)
+                        if audio_rate_supported:
+                            set_music_playback_rate(game_speed_scale)
+                    if event.key == pygame.K_RIGHT:
+                        game_speed_scale = min(GAME_SPEED_MAX, game_speed_scale + GAME_SPEED_STEP)
+                        if audio_rate_supported:
+                            set_music_playback_rate(game_speed_scale)
             elif not on_play_screen and not game_over and not won and control_mode == "flap":
                 if event.type == pygame.KEYDOWN and event.key not in (pygame.K_ESCAPE, pygame.K_TAB):
                     cube_velocity_y = FLAP_IMPULSE
@@ -427,10 +463,11 @@ def run_game():
             continue
 
         if not mod_menu_open and not game_over and not won:
-            elapsed_time += dt_sec
+            scaled_dt = dt_sec * game_speed_scale
+            elapsed_time += scaled_dt
             current_run_recording.append((elapsed_time, cube_y))
             if game_mode == "time_attack":
-                time_attack_remaining -= dt_sec
+                time_attack_remaining -= scaled_dt
                 if time_attack_remaining <= 0:
                     game_over = True
                     ghost_data = list(current_run_recording)
@@ -439,12 +476,12 @@ def run_game():
             scroll_speed = diff_params["base_scroll"] + effective * diff_params["speed_per_point"]
 
             # slow mo: hold space, drains the charge. cooldown after. no rush
-            slow_cooldown_remaining = max(0.0, slow_cooldown_remaining - dt_sec)
+            slow_cooldown_remaining = max(0.0, slow_cooldown_remaining - scaled_dt)
             can_use_slow = slow_cooldown_remaining <= 0
             space_held = pygame.key.get_pressed()[pygame.K_SPACE]
             if space_held and slow_charge > 0 and can_use_slow:
                 time_scale = SLOW_TIME_SCALE
-                drain = (SLOW_CHARGE_MAX / SLOW_DURATION_SEC) * dt_sec
+                drain = (SLOW_CHARGE_MAX / SLOW_DURATION_SEC) * scaled_dt
                 slow_charge = max(0.0, slow_charge - drain)
                 used_slow_this_frame = True
             else:
@@ -453,7 +490,7 @@ def run_game():
             if slow_was_active_prev and not used_slow_this_frame:
                 slow_cooldown_remaining = SLOW_COOLDOWN_SEC
             slow_was_active_prev = used_slow_this_frame
-            effective_dt = dt_sec * time_scale
+            effective_dt = scaled_dt * time_scale
 
             move = scroll_speed * effective_dt
 
@@ -469,14 +506,15 @@ def run_game():
                     cube_velocity_y = 0.0
 
             cube_rect = pygame.Rect(int(cube_x), int(cube_y), CUBE_SIZE, CUBE_SIZE)
+            hitbox_rect = get_player_hitbox_rect(cube_x, cube_y)
 
             for seg in segments:
                 seg.move(-move)
-                if seg.collides_with_cube(cube_rect, play_top, play_bottom, CUBE_BORDER_RADIUS):
+                if seg.collides_with_cube(hitbox_rect, play_top, play_bottom, CUBE_BORDER_RADIUS):
                     game_over = True
                     ghost_data = list(current_run_recording)
                     break
-                if seg.is_in_gap(cube_rect):
+                if seg.is_in_gap(hitbox_rect):
                     seg.was_in_gap = True
                 if not seg.scored and seg.was_in_gap and seg.is_passed_cube(cube_x):
                     seg.scored = True
@@ -509,6 +547,7 @@ def run_game():
             hud_text += f"  |  Time: {max(0, int(time_attack_remaining))}s"
         if game_mode == "flappy":
             hud_text += "  |  Flappy"
+        hud_text += f"  |  Speed: {int(game_speed_scale * 100)}%"
         if not game_over and not won:
             if control_mode == "mouse":
                 hud_text += "  |  Glide with mouse!"
@@ -517,6 +556,10 @@ def run_game():
         hud_text += "  |  TAB = Mod menu"
         text_surf = font_hud.render(hud_text, True, th["hud_text"])
         screen.blit(text_surf, (20, 12))
+        if show_fps:
+            fps_val = clock.get_fps()
+            fps_surf = font_hud.render(f"FPS: {fps_val:.0f}", True, th["hud_text"])
+            screen.blit(fps_surf, (win_w - fps_surf.get_width() - 20, HUD_HEIGHT + 8))
         # slow meter. 2 bars = full. hold space to use. cooldown between. we good
         if not on_play_screen:
             meter_x, meter_y = win_w - 100, 14
@@ -565,7 +608,7 @@ def run_game():
                 draw_cube_with_face(screen, ghost_rect, th, ghost_alpha=100)
         draw_cube_with_face(screen, pygame.Rect(int(cube_x), int(cube_y), CUBE_SIZE, CUBE_SIZE), th)
         if show_hitbox:
-            hitbox_rect = pygame.Rect(int(cube_x), int(cube_y), CUBE_SIZE, CUBE_SIZE)
+            hitbox_rect = get_player_hitbox_rect(cube_x, cube_y)
             pygame.draw.rect(screen, (0, 255, 100), hitbox_rect, 2, border_radius=CUBE_BORDER_RADIUS)
 
         if mod_menu_open:
@@ -601,6 +644,27 @@ def run_game():
             str_ = font_mod.render(f"SFX: {sfx_pct}%  (Z/X)", True, (220, 220, 230))
             screen.blit(str_, str_.get_rect(center=(win_w // 2, win_h // 2 + y_off)))
             y_off += 36
+            speed_pct = int(game_speed_scale * 100)
+            speed_txt = font_mod.render(f"Game speed: {speed_pct}%  (LEFT/RIGHT)", True, (220, 220, 230))
+            screen.blit(speed_txt, speed_txt.get_rect(center=(win_w // 2, win_h // 2 + y_off)))
+            y_off += 24
+            slider_w = 320
+            slider_h = 8
+            slider_x = (win_w - slider_w) // 2
+            slider_y = win_h // 2 + y_off
+            pygame.draw.rect(screen, (70, 80, 95), (slider_x, slider_y, slider_w, slider_h))
+            fill_w = int(((game_speed_scale - GAME_SPEED_MIN) / (GAME_SPEED_MAX - GAME_SPEED_MIN)) * slider_w)
+            pygame.draw.rect(screen, (160, 190, 220), (slider_x, slider_y, fill_w, slider_h))
+            knob_x = slider_x + fill_w
+            pygame.draw.rect(screen, (230, 230, 235), (knob_x - 5, slider_y - 4, 10, slider_h + 8), border_radius=2)
+            y_off += 34
+            pitch_msg = "Audio speed/pitch synced to slider" if audio_rate_supported else "Audio speed/pitch not supported by this pygame build"
+            pitch_surf = font_hud.render(pitch_msg, True, (180, 200, 220))
+            screen.blit(pitch_surf, pitch_surf.get_rect(center=(win_w // 2, win_h // 2 + y_off)))
+            y_off += 30
+            fpsr = font_mod.render(f"FPS counter: {'ON' if show_fps else 'OFF'}  (P)", True, (220, 220, 230))
+            screen.blit(fpsr, fpsr.get_rect(center=(win_w // 2, win_h // 2 + y_off)))
+            y_off += 36
             hint = font_hud.render("Mouse/Flap  |  F11 = fullscreen anywhere", True, (180, 200, 220))
             screen.blit(hint, hint.get_rect(center=(win_w // 2, win_h // 2 + y_off)))
 
@@ -626,12 +690,12 @@ def run_game():
             overlay.set_alpha(220)
             overlay.fill((25, 35, 50))
             screen.blit(overlay, (0, 0))
-            if game_mode == "time_attack":
+            if game_mode == "time_attack (took from danis game called karlson)":
                 title = font_large.render("Time attack complete!", True, (255, 215, 100))
                 sub_txt = f"You got 30 gaps in {int(elapsed_time)} seconds!"
             else:
                 title = font_large.render("SECRET SURPRISE!", True, (255, 215, 100))
-                sub_txt = "You reached 999 gaps! You're a champion." if game_mode != "flappy" else "You reached 999 gaps! Flappy champion."
+                sub_txt = "You reached 30 gaps! You're a champion." if game_mode != "flappy" else "You reached 30 gaps! Flappy champion."
             tr = title.get_rect(center=(win_w // 2, win_h // 2 - 50))
             screen.blit(title, tr)
             sub = font_hud.render(sub_txt, True, (200, 220, 255))
