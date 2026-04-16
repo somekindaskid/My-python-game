@@ -469,9 +469,7 @@ END program
 
 ---
 
-## Evidence Status Snapshot
+## AI Evidence Status Snapshot
 
 Based on your current project, most technical evidence can now be referenced directly from this `README.md`.
-
-- Documentation items in your checklist are now written up.
-- Storyboards/flowchart are included in text form; if your teacher requires hand-drawn/image versions, add them as files and link them here.
+=
